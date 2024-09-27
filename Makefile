@@ -1,25 +1,27 @@
-.PHONY: test compile
+.PHONY: filelist comp sim clean 
 
-export LIBPYTHON_LOC=$(shell cocotb-config --libpython)
 
-test_%:
-	make compile
-	iverilog -o build/sim.vvp -s gpu -g2012 build/gpu.v
-	MODULE=test.test_$* vvp -M $$(cocotb-config --prefix)/cocotb/libs -m libcocotbvpi_icarus build/sim.vvp
+COMPILE_TOOL    := vcs
+COMPILE_OPTIONS := -l ./build/log/comp.log \
 
-compile:
-	make compile_alu
-	sv2v -I src/* -w build/gpu.v
-	echo "" >> build/gpu.v
-	cat build/alu.v >> build/gpu.v
-	echo '`timescale 1ns/1ns' > build/temp.v
-	cat build/gpu.v >> build/temp.v
-	mv build/temp.v build/gpu.v
+SIM_OPTION      := 
 
-compile_%:
-	sv2v -w build/$*.v src/$*.sv
 
-# TODO: Get gtkwave visualizaiton
+SIM_FILES       := -f ./build/filelist.f
+TB_FILES        := 
 
-show_%: %.vcd %.gtkw
-	gtkwave $^
+DEFINE_OPTIONS  := 
+
+filelist :
+	find ./src -name '*v' > ./build/filelist.f
+
+comp : 
+	mkdir build; mkdir ./build/comp; ./build/sim \	
+	${COMPILE_TOOL} ${COMPILE_OPTION} ${SIM_FILES} ${TB_FILES} ${DEFINE_OPTION}
+
+sim  : comp
+	./build/simv ${SIM_OPTION} 
+
+clean :
+	rm -rf ./build
+
