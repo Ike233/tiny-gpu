@@ -18,20 +18,39 @@ module mem_wrapper#(
 		input		[MEM_DATA_BITS-1    : 0]    write_data		[MEM_NUM_CHANNELS-1 : 0]
 	);
 	
-	wire [MEM_NUM_CHANNELS-1 : 0] en,we							;
-	wire [MEM_ADDR_BITS-1    : 0] addr [MEM_NUM_CHANNELS-1 : 0] ;
+	wire [MEM_NUM_CHANNELS-1 : 0] en,we	;
+	wire [MEM_ADDR_BITS-1    : 0] addr  ;
 	
 	localparam preloadfile [MEM_NUM_CHANNELS-1 : 0] ; 
+
+	wire [MEM_NUM_CHANNELS-1 : 0] request,grant,pre_grant;
+	reg  [MEM_NUM_CHANNELS-1 : 0] pre_state;
+
+	always@(posedge clk or negedge rst_n) begin
+		if(!rst_n) begin
+			pre_state <= `MEM_NUM_CHANNELS'd1;
+		end else begin
+			pre_state <= {pre_grant[MEM_NUM_CHANNELS-2:0],pre_grant[MEM_NUM_CHANNELS-1]};
+		end
+	end
+
+	assign pre_grant = {1'b1,request} & ~({1'b1,request} - 1'b1);
+	
+	assign grant = {1'b1,request} & ~({1'b1,request} - pre_state);
+
 
 	//generate signal en & we & addr
 	genvar i;
 	generate
 	for(i=0,i<MEM_NUM_CHANNELS,i=i+1) begin
-		assign en[i] =  read_valid[i] | write_valid[i];
-		assign we[i] = !read_valid[i] & write_valid[i];
+		assign en	 =  grant[i];
+		assign we	 = !read_valid[i] & write_valid[i];
 		
-		assign addr[i] =  read_valid[i] ?  read_address[i] : 
+		assign addr	 =  read_valid[i] ?  read_address[i] : 
 					   ( write_valid[i] ? write_address[i] : 'd0 ); 
+			
+	end
+	endgenerate
 
 		ram #(
 			.preloadfile    (preloadfile[i]		),
@@ -40,14 +59,13 @@ module mem_wrapper#(
 		) u_ram (
 			.clk			(clk				),
 			.rst_n			(rst_n				),
-			.en				(en[i]				),
-			.we				(we[i]				),
-			.addr			(addr[i]			),
+			.en				(en					),
+			.we				(we					),
+			.addr			(addr				),
 			.din			(write_data[i]		),
 			.dout			(read_data[i]		)
 		); 
-			
-	end
-	endgenerate
+
+
 
 endmodule
